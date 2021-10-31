@@ -1,0 +1,458 @@
+---
+title: "Demo parsing - nades"
+output: html_notebook
+---
+
+```{r imports, message=FALSE, warnings=FALSE}
+library(tidyverse)
+library(vroom)
+library(scales)
+library(janitor)
+library(glue)
+library(bbplot)
+library(ggthemes)
+library(ggrepel)
+library(ggforce)
+library(patchwork)
+library(ggtext)
+library(jpeg)
+library(ggpubr)
+
+windowsFonts(Helvetica = "Product Sans")
+
+theme_lox <- function() {
+  theme(panel.grid.major.x = element_line(size = 0.3, colour = "#cbcbcb"),
+        panel.grid.major.y = element_line(size = 0.3, colour = "#cbcbcb"),
+        plot.title = element_markdown(family = 'Helvetica', size = 22, face = "bold", color = "#222222"),
+        plot.subtitle = element_text(family = 'Helvetica', size = 16, margin = margin(2,0,2,0)),
+        plot.caption = element_text(family = 'Helvetica', face = 'bold'),
+        axis.text = element_text(family = "Helvetica", size = 12, color = "#222222"),
+        axis.title = element_text(family = "Helvetica", size = 14, color = "#222222"),
+        legend.text = element_text(family = "Helvetica", size = 12),
+        legend.title = element_text(family = "Helvetica", size = 14, face = 'bold'),
+        legend.position = 'right',
+        strip.text = element_text(family = "Helvetica", size = 12, hjust = 0.5)
+  )
+}
+
+subtitle <- "Na'Vi vs. Virtus.Pro | Semi-final | IEM Fall 2021 CIS"
+caption <- "Data: Demofile | Graphic: @lakshyaag"
+
+knitr::opts_chunk$set(echo = TRUE, fig.width = 12, fig.height = 7, dpi = 320, dev = "png")
+```
+
+```{r}
+match_id = "navi-vs-vp-IEM-FALL21"
+
+rounds <-
+  vroom(glue("./data_files/{match_id}/{match_id}_rounds.csv", delim = ","))
+kills <-
+  vroom(glue("./data_files/{match_id}/{match_id}_kills.csv", delim = ","))
+grenades <-
+  vroom(glue("./data_files/{match_id}/{match_id}_grenades.csv", delim = ",")) %>%
+  mutate(GrenadeType = replace(GrenadeType, GrenadeType == "Incendiary Grenade", "Molotov")) %>%
+  filter(GrenadeType != "Decoy Grenade")
+
+dir.create(file.path(glue("./output/{match_id}")), showWarnings = FALSE)
+```
+
+
+```{r}
+maps <- rounds %>% select(MapName) %>% unique() %>% pull()
+maps
+
+game_length <- length(maps)
+
+for (i in 1:game_length) {
+  dir.create(file.path(glue("./output/{match_id}/{maps[i]}")), showWarnings = FALSE)
+}
+
+teams <- rounds %>% select(TTeam) %>% unique() %>% pull()
+teams
+
+players <- kills %>% select(VictimTeam, VictimName) %>% unique()
+players
+```
+
+```{r}
+map_coordinates <- jsonlite::read_json('map_coords.json', simplifyVector = T)
+```
+
+```{r}
+translate_scale_x <- function(usr_x, map_x, scale) {
+  x_trans = (usr_x - map_x) / scale
+  
+  return (abs(x_trans))
+}
+
+translate_scale_y <- function(usr_y, map_y, scale) {
+  y_trans = (map_y - usr_y) / scale
+  
+  return (abs(y_trans))
+}
+```
+
+```{r}
+grenade_colors <-
+  c(
+    "Flashbang" = "#5778a4",
+    "Smoke Grenade" = "#b8b0ac",
+    "HE Grenade" = "#6a9f58",
+    "Molotov" = "#d1615d",
+    "Decoy Grenade" = "#967662"
+  )
+
+grenade_colors_map <-
+  c(
+    "Flashbang" = "#2c77db",
+    "Smoke Grenade" = "#e3e3e3",
+    "HE Grenade" = "#4cdb1d",
+    "Molotov" = "#c9221c",
+    "Decoy Grenade" = "#78513a"
+  )
+```
+
+
+# Who throws what?
+## 100% stacked chart
+```{r}
+throws_plot <- function(map_num, team_num, save_individual = TRUE) {
+    
+  team = teams[team_num]
+  map_focus = maps[map_num]
+  
+  throws <- grenades %>%
+    filter(MapName == map_focus) %>%
+    filter(ThrowerTeam == team) %>%
+    count(ThrowerName, GrenadeType, sort = TRUE) %>%
+    #mutate(GrenadeType = fct_reorder(GrenadeType, n, .fun = sum)) %>%
+    group_by(ThrowerName) %>%
+    mutate(pct_n = prop.table(n)) %>%
+    ungroup()
+  
+  throws_total <- throws %>%
+    group_by(ThrowerName) %>%
+    summarise(total_nades = sum(n)) %>%
+    ungroup()
+  
+  plot <- throws %>%
+    ggplot(aes(y = ThrowerName, x = pct_n)) +
+    geom_col(aes(fill = GrenadeType), position = position_stack()) +
+    geom_label(
+      data = throws_total,
+      aes(x = 1, y = ThrowerName, label = total_nades),
+      nudge_x = 0.01,
+      family = "Helvetica",
+      fontface = "bold"
+    ) +
+    scale_x_continuous(labels = label_percent()) +
+    scale_fill_manual(values = grenade_colors) +
+    labs(x = "% of grenades", y = "", fill = "Type of grenade") +
+    bbc_style() +
+    theme_lox() +
+    theme(axis.text.y = element_text(face = 'bold')) +
+    ggtitle(glue("{map_focus}"))
+  
+  return(plot)
+}
+
+team_throw <- function(team_num, save_individual = TRUE, isbo1 = FALSE) {
+  
+  team = teams[team_num]
+  
+  m1 <- throws_plot(1, team_num, save_individual = save_individual)
+  
+  if (!isbo1) {
+    m2 <- throws_plot(2, team_num, save_individual = save_individual)
+    if (!is.na(maps[3])) {
+      m3 <- throws_plot(3, team_num, save_individual = save_individual)
+      map_grenade_throws <- (m1 / m2 / m3)
+    } else {
+      map_grenade_throws <- (m1 / m2)
+    }
+  } else {
+    map_grenade_throws <- m1
+  }
+  
+  map_grenade_throws <- map_grenade_throws +
+    plot_annotation(
+      title = glue("Grenades thrown by {team}"),
+      subtitle = subtitle,
+      caption = caption,
+      theme = theme_lox()
+    )
+  
+  if (save_individual) {
+    ggsave(
+      glue("./output/{match_id}/{team}_grenades_thrown.png"),
+      map_grenade_throws,
+      width = ifelse(isbo1, 16, 20),
+      height = ifelse(isbo1, 8, 12),
+      units = 'in',
+      dpi = 300
+    )
+  }
+  
+  return(map_grenade_throws)
+}
+
+match_grenades_thrown <-
+  function(save_indivdiual = TRUE,
+           isbo1 = FALSE) {
+    
+    t1_grenades <- team_throw(1, save_individual = save_indivdiual, isbo1 = isbo1)
+    t2_grenades <- team_throw(2, save_individual = save_indivdiual, isbo1 = isbo1)
+    
+    match_grenades <- (t1_grenades | t2_grenades) +
+      plot_annotation(
+        title = glue("Types of grenades thrown by {teams[1]} and {teams[2]}"),
+        subtitle = subtitle,
+        caption = caption,
+        theme = theme_lox()
+      )
+    
+    ggsave(
+      glue("./output/{match_id}/match_grenades_thrown.png"),
+      match_grenades,
+      width = ifelse(isbo1, 20, 20),
+      height = ifelse(isbo1, 8, 12),
+      units = 'in',
+      dpi = 300
+    )
+    
+    return(match_grenades)
+  }
+
+
+match_grenades_thrown(save_indivdiual = TRUE, isbo1 = FALSE)
+
+```
+# Team grenade usage
+```{r}
+team_grenade_plot <-
+  function(map_num,
+           save_individual = TRUE) {
+    map_focus = maps[map_num]
+    
+    throws <- grenades %>%
+      filter(MapName == map_focus) %>%
+      count(ThrowerTeam, GrenadeType, sort = TRUE) %>%
+      group_by(ThrowerTeam) %>%
+      ungroup()
+    
+    plot <- throws %>%
+      ggplot(aes(x = ThrowerTeam, y = n)) +
+      geom_col(aes(fill = GrenadeType), position = position_dodge2()) +
+      scale_y_continuous(breaks = pretty_breaks(5)) +
+      geom_label(aes(label = n, group = GrenadeType), position = position_dodge2(width = 0.9), size = 4) +
+      scale_fill_manual(values = grenade_colors) +
+      labs(y = "# of grenades", x = "", fill = "Type of grenade") +
+      bbc_style() +
+      theme_lox() +
+      theme(axis.text.x = element_text(face = 'bold'))
+    
+    if (save_individual) {
+      ggsave(
+        glue(
+          "./output/{match_id}/{map_focus}_grenade_comparison.png"
+        ),
+        plot + plot_annotation(
+          title = glue("Grenades thrown by {teams[1]} and {teams[2]} on {map_focus}"),
+          subtitle = subtitle,
+          caption = caption,
+          theme = theme_lox()
+        ),
+        width = 16,
+        height = 8,
+        units = 'in',
+        dpi = 300
+      )
+    }
+    
+    return(plot + ggtitle(glue("{map_focus}")))
+  }
+
+team_grenade_maps <-
+  function(save_individual = TRUE,
+           isbo1 = FALSE) {
+    m1 <- team_grenade_plot(1, save_individual = save_individual)
+    
+    if (!isbo1) {
+      m2 <- team_grenade_plot(2, save_individual = save_individual)
+      if (!is.na(maps[3])) {
+        m3 <- team_grenade_plot(3, save_individual = save_individual)
+        team_grenade_throws <- (m1 / m2 / m3)
+      } else {
+        team_grenade_throws <- (m1 / m2)
+      }
+    } else {
+      team_grenade_throws <- m1
+    }
+    
+    team_grenade_throws <- team_grenade_throws +
+      plot_annotation(
+        title = glue("Grenades thrown by {teams[1]} and {teams[2]}"),
+        subtitle = subtitle,
+        caption = caption,
+        theme = theme_lox()
+      )
+    
+    ggsave(
+      glue("./output/{match_id}/team_grenades_thrown.png"),
+      team_grenade_throws,
+      width = ifelse(isbo1, 16, 20),
+      height = ifelse(isbo1, 8, 12),
+      units = 'in',
+      dpi = 300
+    )
+    
+    return(team_grenade_throws)
+  }
+
+team_grenade_maps(T, F)
+```
+
+
+# Grenade map
+```{r}
+grenade_trajectory_plot <-
+  function(map_num, player_name, save_individual = TRUE) {
+    map_focus = maps[map_num]
+    
+    player = player_name
+    
+    map_x = map_coordinates %>% filter(map_name == map_focus) %>% pull(x)
+    map_y = map_coordinates %>% filter(map_name == map_focus) %>% pull(y)
+    scale = map_coordinates %>% filter(map_name == map_focus) %>% pull(scale)
+    
+    map_image = readJPEG(glue("maps/sr/{map_focus}_radar.jpg"), native = TRUE)
+    
+    throw_land_coords <- grenades %>%
+      filter(MapName == map_focus) %>%
+      select(starts_with(c('Thrower', 'Grenade'))) %>%
+      mutate(ThrowerMapX = translate_scale_x(ThrowerX, map_x, scale)) %>%
+      mutate(ThrowerMapY = translate_scale_y(ThrowerY, map_y, scale)) %>%
+      mutate(GrenadeMapX = translate_scale_x(GrenadeX, map_x, scale)) %>%
+      mutate(GrenadeMapY = translate_scale_y(GrenadeY, map_y, scale)) %>%
+      mutate(
+        ThrowerSide = case_when(
+          ThrowerSide == "CT" ~ "Counter-Terrorist",
+          ThrowerSide == "T" ~ "Terrorist",
+          TRUE ~ ThrowerSide
+        )
+      )
+    
+    player_grenades_map <- ggplot(
+      throw_land_coords %>% filter(ThrowerName == player),
+      aes(
+        x = ThrowerMapX,
+        y = ThrowerMapY,
+        xend = GrenadeMapX,
+        yend = GrenadeMapY,
+        colour = GrenadeType
+      )
+    ) +
+      background_image(map_image) +
+      geom_segment(
+        arrow = arrow(length = unit(0.25, "cm")),
+        lineend = 'round',
+        linejoin = 'mitre',
+        size = 1.1,
+        alpha = 0.5
+      ) +
+      scale_color_manual(values = grenade_colors_map) +
+      scale_x_continuous(limits = c(0, 1024), expand = c(0, 0)) +
+      scale_y_reverse(limits = c(1024, 0), expand = c(0, 0)) +
+      labs(color = "Type of grenade") +
+      theme_void() +
+      theme(
+        legend.text = element_text(family = "Helvetica", size = 12),
+        legend.title = element_text(
+          family = "Helvetica",
+          size = 14,
+          face = 'bold'
+        ),
+        legend.position = 'bottom',
+        strip.text = element_text(
+          family = "Helvetica",
+          color = 'white',
+          size = 12,
+          hjust = 0.5,
+          vjust = 0.5,
+          face = 'bold'
+        ),
+        strip.background = element_rect(fill = "grey5", colour = NA)
+      ) +
+      facet_wrap( ~ ThrowerSide, scales = 'free') +
+      plot_annotation(
+        title = glue(
+          "Grenade trajectories of <span style='color:#c44037;'>{player}</span> on {map_focus}"
+        ),
+        subtitle = subtitle,
+        caption = caption,
+        theme = theme_lox()
+      )
+    
+    if (save_individual) {
+      ggsave(
+        glue(
+          "./output/{match_id}/{map_focus}/{player}_grenades_{map_focus}.png"
+        ),
+        player_grenades_map,
+        width = 14,
+        height = 8,
+        dpi = 300
+      )
+    }
+    
+    return(player_grenades_map + ggtitle(glue("{player}")))
+  }
+
+```
+
+```{r}
+team_grenade_trajectory_plot <-
+  function(map_num, team_number, save_individual = TRUE) {
+    team_player_grenades <-
+      lapply(
+        players %>% filter(VictimTeam == teams[team_number]) %>% select(VictimName) %>% unique %>% pull(),
+        grenade_trajectory_plot,
+        map_num = map_num,
+        save_individual = save_individual
+      )
+    
+    team_grenade_plot <- wrap_plots(
+      team_player_grenades,
+      guides = 'collect',
+      nrow = 5,
+      ncol = 1,
+    ) +
+      plot_annotation(
+        title = glue(
+          "Grenade trajectories of <span style='color:#c44037;'>{teams[team_number]}</span> on {maps[map_num]}"
+        ),
+        subtitle = subtitle,
+        caption = caption,
+        theme = theme_lox() + theme(legend.position = 'bottom')
+      )
+    
+    ggsave(
+      glue(
+        "./output/{match_id}/{maps[map_num]}/{teams[team_number]}_grenades_{maps[map_num]}.png"
+      ),
+      team_grenade_plot,
+      width = 7,
+      height = 15,
+      dpi = 300
+    )
+    
+    return(team_grenade_plot)
+  }
+
+team_grenade_trajectory_plot(1, 1, T)
+team_grenade_trajectory_plot(1, 2, T)
+
+team_grenade_trajectory_plot(2, 1, T)
+team_grenade_trajectory_plot(2, 2, T)
+```
+
