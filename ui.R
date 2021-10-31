@@ -1,7 +1,6 @@
 library(shiny)
 library(bslib)
 library(shinycssloaders)
-library(waiter)
 
 ui <-
     bootstrapPage(
