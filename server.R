@@ -265,7 +265,7 @@ grenadeTrajectoryPlot <-
 
 shinyServer(function(input, output) {
     thematic_shiny()
-
+    
     data <- reactive({
         req(input$dataUpload)
         read_csv(input$dataUpload$datapath) %>%

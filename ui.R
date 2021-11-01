@@ -1,3 +1,4 @@
+library(magrittr)
 library(shiny)
 library(bslib)
 library(shinycssloaders)
@@ -64,7 +65,7 @@ ui <-
         ),
         HTML(
             '
-            <footer class="footer mt-auto py-2 bg-light">
+            <footer class="footer mt-auto fixed-bottom bg-light">
                 <div class="container">
                     <div class="row">
                         <div class="col-6">
