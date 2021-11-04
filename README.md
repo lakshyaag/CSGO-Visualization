@@ -44,7 +44,10 @@ Using this parser is simple. For example, if you wanted to check the grenade tra
 1. Download the `.zip` file from HLTV and unzip the contents into `/CSGO-Visualization/demos/PGL-Major-Stockholm-2021-copenhagen-flames-vs-nip-bo3`
 2. Open a terminal/shell and navigate to `/CSGO-Visualization/demos/`
 3. Run the following line
-   `python ../parse.py "./PGL-Major-Stockholm-2021-copenhagen-flames-vs-nip-bo3/" "cph-vs-nip-bo3-pgl-major-2021" -j`
+
+   ```cmd
+   python ../parse.py "./PGL-Major-Stockholm-2021-copenhagen-flames-vs-nip-bo3/" "cph-vs-nip-bo3-pgl-major-2021" -j
+   ```
 
    Here, the first argument specifies the folder containing the `.dem` files, the second argument provides the `match_id` to use. Finally, `-j` tells the parser to remove the interim `.json` output to save disk space.
 
