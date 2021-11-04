@@ -90,7 +90,7 @@ Please feel free to reach out to me on [Twitter](https://twitter.com/lakshyaag)
 
 ## Acknowledgments
 
-Huge thanks to the Python [csgo](https://github.com/pnxenopoulos/csgo) package, [SimpleRadar](https://readtldr.gg/simpleradar-download) for the cleanest radar images available and [HLTV](https://www.hltv.org/).
+Huge thanks to the Python [csgo](https://github.com/pnxenopoulos/csgo) package for efficient parsing, to [SimpleRadar](https://readtldr.gg/simpleradar-download) for the cleanest radar images available and to [HLTV](https://www.hltv.org/) for being the go-to source of Counter-Strike.
 
 ## `parse.py`
 
