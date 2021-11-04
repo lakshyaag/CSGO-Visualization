@@ -1,6 +1,6 @@
 # CSGO Visualization
 
-Application to quickly view grenade trajectories for all players in a CSGO match
+Library to quickly view **grenade trajectories** and **weapon heatmaps** for all players by parsing CSGO demo files.
 
 ## Getting started
 
@@ -17,7 +17,7 @@ After installing the CS:GO library on your environment and downloading the requi
 3. Create a new folder called `demos` and move all download `.dem` files to be parsed - read [Directory Strucutre](#directory-structure) for more
 4. Run `parse.py`, specifying the folder name containing the `.dem` files and the `match_id`
 5. The parser will take care of appending all maps in a match and will provide `.csv` files for multiple metrics such as Kills, Damages, Grenades, Rounds, etc. in a folder named `parsed_demo_files`
-6. Upload the `grenades.csv` file of the respective match to the [Shiny app](https://lakshyaag.shinyapps.io/CSGO-Visualization/)!
+6. Upload the `grenades.csv`/`weapons.csv` file of the respective match to the [Shiny app](https://lakshyaag.shinyapps.io/CSGO-Visualization/)!
 
 ## Directory structure
 
@@ -88,4 +88,4 @@ Please feel free to reach out to me on [Twitter](https://twitter.com/lakshyaag)
 
 ## Acknowledgments
 
-This project is made possible by the amazing Python parser in the [csgo](https://github.com/pnxenopoulos/csgo) package, [SimpleRadar](https://readtldr.gg/simpleradar-download) for the cleanest radar images available and [HLTV](https://www.hltv.org/).
+Huge thanks to the Python [csgo](https://github.com/pnxenopoulos/csgo) package, [SimpleRadar](https://readtldr.gg/simpleradar-download) for the cleanest radar images available and [HLTV](https://www.hltv.org/).

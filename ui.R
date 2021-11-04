@@ -4,69 +4,112 @@ library(bslib)
 library(shinycssloaders)
 
 ui <-
-    bootstrapPage(
+    navbarPage(
+        title = "",
+        position = "static-top",
+        collapsible = TRUE,
+        inverse = TRUE,
+        windowTitle = "CSGO Visualization",
         theme = bs_theme(
             version = 5,
             base_font = font_google("Lato"),
-            primary = "#00796B",
-            bootswatch = "zephyr"
+            primary = "#009688",
+            bootswatch = "zephyr",
+            "navbar-light-bg" = "#009688"
         ) %>% bs_add_rules(
             "
             .shiny-input-container {margin: auto}
             .progress {height: 1rem}
             .col-sm-8 {margin-right: auto !important; margin-left: auto !important; width: 83.33% !important}
-            img {padding-bottom: 3rem !important}
-            @media (min-width: 992px) { img {padding-bottom: 1.75rem !important} }
+            .navbar-nav {justify-content: center !important; font-size: 1rem !important}
+            img {padding-bottom: 5rem !important}
+            @media (min-width: 992px) { img {padding-bottom: 3rem !important} }
             "
         ),
-        h1(class = "text-center mt-2", "CS:GO grenade visualization"),
-        h5(
-            class = "text-center mt-2",
-            "Upload the file containing grenade data to view the trajectory maps and breakdown."
-        ),
-        div(
-            class = "container-fluid col-6 justify-content-center p-3",
+        
+        tabPanel(
+            title = "Grenades",
+            icon = icon("bomb"),
             div(
-                class = "card shadow",
-                div(
-                    class = "card-body text-center d-flex",
-                    fileInput(
-                        "dataUpload", "Upload .csv file",
-                        accept = c(".csv")
-                    )
-                )
+                class = "container-fluid col-12",
+                h2(class = "text-center mt-2", "CS:GO grenade visualization"),
+                h5(
+                    class = "text-center mt-2",
+                    "Upload the file containing grenade data to view the trajectory maps and breakdown."
+                ),
+                div(class = "container-fluid col-6 justify-content-center p-3",
+                    div(
+                        class = "card shadow",
+                        div(class = "card-body text-center d-flex",
+                            fileInput(
+                                "dataUploadGrenades", "Upload .csv file",
+                                accept = c(".csv")
+                            ))
+                    )),
+                div(class = "container-fluid col-12",
+                    mainPanel(div(
+                        class = "col-12",
+                        tabsetPanel(
+                            id = "output",
+                            type = "pills",
+                            tabPanel(
+                                "Grenade trajectories",
+                                fluidRow(column(width = 6, uiOutput("selectMap_2")),
+                                         column(width = 6, uiOutput("selectPlayer"))),
+                                hr(),
+                                plotOutput("grenadeTrajectory", width = "100%") %>% withSpinner()
+                            ),
+                            tabPanel(
+                                "Grenade breakdown",
+                                fluidRow(column(width = 6, uiOutput("selectMap_1")),
+                                         column(width = 6, uiOutput("selectTeam"))),
+                                hr(),
+                                plotOutput("matchGrenadesThrown", width = "100%") %>% withSpinner()
+                            )
+                        )
+                    )))
             )
         ),
-        div(
-            class = "container-fluid col-12",
-            mainPanel(div(
-                class = "col-12",
-                tabsetPanel(
-                    id = "output",
-                    type = "pills",
-                    tabPanel(
-                        "Grenade trajectories",
-                        fluidRow(
-                            column(width = 6, uiOutput("selectMap_2")),
-                            column(width = 6, uiOutput("selectPlayer"))
-                        ),
-                        hr(),
-                        plotOutput("grenadeTrajectory", width = "100%") %>% withSpinner()
-                    ),
-                    tabPanel(
-                        "Grenade breakdown",
-                        fluidRow(
-                            column(width = 6, uiOutput("selectMap_1")),
-                            column(width = 6, uiOutput("selectTeam"))
-                        ),
-                        hr(),
-                        plotOutput("matchGrenadesThrown", width = "100%") %>% withSpinner()
-                    )
-                )
-            ))
+        tabPanel(
+            title = "Weapons",
+            icon = icon("skull"),
+            div(
+                class = "container-fluid col-12",
+                h2(class = "text-center mt-2", "CS:GO weapon heatmap"),
+                h5(
+                    class = "text-center mt-2",
+                    "Upload the file containing kills data to view the heatmaps"
+                ),
+                div(class = "container-fluid col-6 justify-content-center p-3",
+                    div(
+                        class = "card shadow",
+                        div(class = "card-body text-center d-flex",
+                            fileInput(
+                                "dataUploadKills", "Upload .csv file",
+                                accept = c(".csv")
+                            ))
+                    )),
+                div(class = "container-fluid col-12",
+                    mainPanel(div(
+                        class = "col-12",
+                        tabsetPanel(
+                            id = "output",
+                            type = "pills",
+                            tabPanel(
+                                "Weapon heatmap",
+                                fluidRow(column(width = 4, uiOutput("selectMap_3")),
+                                         column(width = 4, uiOutput("selectWeapon")),
+                                         column(width = 4, uiOutput("selectAttackerOrVictim"))),
+                                hr(),
+                                plotOutput("weaponHeatmap", width = "100%") %>% withSpinner()
+                            )
+                        )
+                    )))
+            )
         ),
-        HTML(
-            '
+        footer =
+            HTML(
+                '
             <footer class="footer mt-auto fixed-bottom bg-light">
                 <div class="container">
                     <div class="row">
@@ -86,5 +129,5 @@ ui <-
                 </div>
             </footer>
              '
-        )
+            )
     )

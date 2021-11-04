@@ -11,6 +11,8 @@ library(ggthemes)
 library(patchwork)
 library(ggtext)
 library(png)
+library(RColorBrewer)
+library(paletteer)
 library(ggpubr)
 
 
@@ -66,13 +68,13 @@ mapCoordinates <-
 
 translateScaleX <- function(usr_x, map_x, scale) {
     x_trans <- (usr_x - map_x) / scale
-
+    
     return(abs(x_trans))
 }
 
 translateScaleY <- function(usr_y, map_y, scale) {
     y_trans <- (map_y - usr_y) / scale
-
+    
     return(abs(y_trans))
 }
 
@@ -104,12 +106,12 @@ throwsPlot <- function(map_focus, team, data) {
         group_by(throwerName) %>%
         mutate(pct_n = prop.table(n)) %>%
         ungroup()
-
+    
     throws_total <- throws %>%
         group_by(throwerName) %>%
         summarise(total_nades = sum(n)) %>%
         ungroup()
-
+    
     plot <- throws %>%
         ggplot(aes(y = throwerName, x = pct_n)) +
         geom_col(aes(fill = grenadeType), position = position_stack()) +
@@ -125,11 +127,9 @@ throwsPlot <- function(map_focus, team, data) {
         labs(x = "% of grenades", y = "", fill = "Type of grenade") +
         bbc_style() +
         theme_lox() +
-        theme(
-            axis.text.y = element_text(face = "bold"),
-            legend.position = "bottom"
-        )
-
+        theme(axis.text.y = element_text(face = "bold"),
+              legend.position = "bottom")
+    
     return(plot)
 }
 
@@ -139,7 +139,7 @@ grenadeBreakdownPlot <- function(teams, map_focus, team, data) {
             throwsPlot(map_focus, teams[1], data) + ggtitle(glue("{teams[1]}"))
         team2 <-
             throwsPlot(map_focus, teams[2], data) + ggtitle(glue("{teams[2]}"))
-
+        
         plot <-
             wrap_plots(
                 team1,
@@ -157,7 +157,7 @@ grenadeBreakdownPlot <- function(teams, map_focus, team, data) {
                 caption = caption,
                 theme = theme_lox() + theme(legend.position = "bottom")
             )
-
+        
         return(plot)
     } else {
         plot <- throwsPlot(map_focus, team, data) +
@@ -169,7 +169,7 @@ grenadeBreakdownPlot <- function(teams, map_focus, team, data) {
                 caption = caption,
                 theme = theme_lox()
             )
-
+        
         return(plot)
     }
 }
@@ -185,9 +185,10 @@ grenadeTrajectoryPlot <-
         scale <- mapCoordinates %>%
             filter(map_name == map_focus) %>%
             pull(scale)
-
-        map_image <- readPNG(glue("maps/{map_focus}_light.png"), native = TRUE)
-
+        
+        map_image <-
+            readPNG(glue("maps/{map_focus}_light.png"), native = TRUE)
+        
         throw_land_coords <- data %>%
             filter(mapName == map_focus) %>%
             select(starts_with(c("thrower", "grenade"))) %>%
@@ -202,7 +203,7 @@ grenadeTrajectoryPlot <-
                     TRUE ~ throwerSide
                 )
             )
-
+        
         player_grenades_map <- ggplot(
             throw_land_coords %>% filter(throwerName == player),
             aes(
@@ -244,7 +245,7 @@ grenadeTrajectoryPlot <-
                 ),
                 strip.background = element_rect(fill = "grey5", colour = NA)
             ) +
-            facet_wrap(~throwerSide, scales = "free") +
+            facet_wrap( ~ throwerSide, scales = "free") +
             plot_annotation(
                 title = glue(
                     "Grenade trajectories of <span style='color:#c44037;'>{player}</span> on {map_focus}"
@@ -253,22 +254,92 @@ grenadeTrajectoryPlot <-
                 caption = caption,
                 theme = theme_lox()
             )
-
+        
         return(player_grenades_map)
     }
 
 
-
+weaponHeatmapPlot <-
+    function(map_focus,
+             weapon_inspect,
+             attackerOrVictim,
+             data) {
+        map_image = readPNG(glue("maps/{map_focus}_light.png"), native = TRUE)
+        
+        map_x <- mapCoordinates %>%
+            filter(map_name == map_focus) %>%
+            pull(x)
+        map_y <- mapCoordinates %>%
+            filter(map_name == map_focus) %>%
+            pull(y)
+        scale <- mapCoordinates %>%
+            filter(map_name == map_focus) %>%
+            pull(scale)
+        
+        kills_weapon <- data %>%
+            filter(weapon == weapon_inspect & mapName == map_focus)
+        
+        kills_coords <- kills_weapon %>%
+            select(attackerX, attackerY, victimX, victimY, mapName, roundNum) %>%
+            mutate(attackerX = translateScaleX(attackerX, map_x, scale)) %>%
+            mutate(victimX = translateScaleX(victimX, map_x, scale)) %>%
+            mutate(attackerY = translateScaleY(attackerY, map_y, scale)) %>%
+            mutate(victimY = translateScaleY(victimY, map_y, scale))
+        
+        killer_heatmap <- switch (
+            attackerOrVictim,
+            "killer" = ggplot(kills_coords,
+                              aes(x = attackerX,
+                                  y = attackerY)),
+            "victim" = ggplot(kills_coords,
+                              aes(x = victimX,
+                                  y = victimY))
+        )
+        
+        killer_heatmap <- killer_heatmap +
+            background_image(map_image) +
+            stat_density_2d_filled(
+                geom = "polygon",
+                contour = TRUE,
+                contour_var = 'ndensity',
+                h = c(32, 32),
+                n = 750,
+                aes(fill = (..level..)),
+                breaks = seq(0.15, 1, length.out = 6),
+                alpha = 0.9
+            ) +
+            scale_fill_manual(values = c(colorRampPalette(
+                paletteer_d(
+                    "RColorBrewer::RdYlGn",
+                    n = 11,
+                    direction = -1
+                )
+            )(6))) +
+            scale_x_continuous(limits = c(0, 1024), expand = c(0, 0)) +
+            scale_y_reverse(limits = c(1024, 0), expand = c(0, 0)) +
+            guides(fill = F) +
+            theme_void() +
+            plot_annotation(
+                title = glue(
+                    "Kill heatmap using <span style='color:#c44037;'>{weapon_inspect}</span> on *{map_focus}*"
+                ),
+                # subtitle = glue("{number_of_matches_kills} matches | {subtitle}"),
+                caption = caption,
+                theme = theme_lox()
+            )
+        
+        return(killer_heatmap)
+    }
 
 
 # Server functions start here ----
 
 shinyServer(function(input, output) {
-    thematic_shiny()
+    # Grenade visualization ----
     
-    data <- reactive({
-        req(input$dataUpload)
-        read_csv(input$dataUpload$datapath) %>%
+    grenadeData <- reactive({
+        req(input$dataUploadGrenades)
+        read_csv(input$dataUploadGrenades$datapath) %>%
             mutate(grenadeType = replace(
                 grenadeType,
                 grenadeType == "Incendiary Grenade",
@@ -276,42 +347,41 @@ shinyServer(function(input, output) {
             )) %>%
             filter(grenadeType != "Decoy Grenade")
     })
-
+    
     maps <-
         reactive({
-            data() %>%
+            grenadeData() %>%
                 select(mapName) %>%
                 unique() %>%
                 pull()
         })
     teams <-
         reactive({
-            data() %>%
+            grenadeData() %>%
                 select(throwerTeam) %>%
                 unique() %>%
                 pull()
         })
     players <-
         reactive({
-            data() %>%
+            grenadeData() %>%
                 select(throwerName) %>%
                 unique() %>%
                 pull()
         })
-
-
+    
+    
     output$selectMap_1 <- renderUI({
-        req(input$dataUpload)
+        req(input$dataUploadGrenades)
         selectInput("mapNum_1",
-            "Select map",
-            maps(),
-            selectize = T,
-            width = "100%"
-        )
+                    "Select map",
+                    maps(),
+                    selectize = T,
+                    width = "100%")
     })
-
+    
     output$selectTeam <- renderUI({
-        req(input$dataUpload)
+        req(input$dataUploadGrenades)
         selectInput(
             "teamNum",
             "Select team",
@@ -320,25 +390,24 @@ shinyServer(function(input, output) {
             width = "100%"
         )
     })
-
-
+    
+    
     output$matchGrenadesThrown <- renderPlot({
-        req(input$dataUpload)
-        grenadeBreakdownPlot(teams(), input$mapNum_1, input$teamNum, data())
+        req(input$dataUploadGrenades)
+        grenadeBreakdownPlot(teams(), input$mapNum_1, input$teamNum, grenadeData())
     }, height = 600)
-
+    
     output$selectMap_2 <- renderUI({
-        req(input$dataUpload)
+        req(input$dataUploadGrenades)
         selectInput("mapNum_2",
-            "Select map",
-            maps(),
-            selectize = T,
-            width = "100%"
-        )
+                    "Select map",
+                    maps(),
+                    selectize = T,
+                    width = "100%")
     })
-
+    
     output$selectPlayer <- renderUI({
-        req(input$dataUpload)
+        req(input$dataUploadGrenades)
         selectInput(
             "playerName",
             "Select player",
@@ -347,9 +416,77 @@ shinyServer(function(input, output) {
             width = "100%"
         )
     })
-
+    
     output$grenadeTrajectory <- renderPlot({
-        req(input$dataUpload)
-        grenadeTrajectoryPlot(input$mapNum_2, input$playerName, data())
+        req(input$dataUploadGrenades)
+        grenadeTrajectoryPlot(input$mapNum_2, input$playerName, grenadeData())
     }, height = 600)
+    
+    # Weapon heatmap ----
+    
+    weaponData <- reactive({
+        req(input$dataUploadKills)
+        read_csv(input$dataUploadKills$datapath)
+    })
+    
+    weaponMaps <-
+        reactive({
+            weaponData() %>%
+                select(mapName) %>%
+                unique() %>%
+                pull()
+        })
+    
+    output$selectMap_3 <- renderUI({
+        req(input$dataUploadKills)
+        selectInput(
+            "mapNum_3",
+            "Select map",
+            weaponMaps(),
+            selectize = T,
+            width = "100%"
+        )
+    })
+    
+    weaponList <-
+        reactive({
+            weaponData() %>%
+                filter(mapName == input$mapNum_3) %>%
+                select(weapon) %>%
+                unique() %>%
+                pull()
+        })
+    
+    output$selectWeapon <- renderUI({
+        req(input$dataUploadKills)
+        selectInput(
+            "weaponName",
+            "Select weapon",
+            weaponList(),
+            selectize = T,
+            width = "100%"
+        )
+    })
+    
+    output$selectAttackerOrVictim <- renderUI({
+        req(input$dataUploadKills)
+        radioButtons(
+            "attackerOrVictim",
+            "Attacker or victim?",
+            c("Attacker" = "killer", "Victim" = "victim"),
+            width = "100%",
+            inline = TRUE
+        )
+    })
+    
+    output$weaponHeatmap <- renderPlot({
+        req(input$dataUploadKills)
+        weaponHeatmapPlot(input$mapNum_3,
+                          input$weaponName,
+                          input$attackerOrVictim,
+                          weaponData())
+    }, height = 600)
+    
+    
+    
 })
