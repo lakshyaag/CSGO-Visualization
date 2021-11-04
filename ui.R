@@ -15,6 +15,8 @@ ui <-
             .shiny-input-container {margin: auto}
             .progress {height: 1rem}
             .col-sm-8 {margin-right: auto !important; margin-left: auto !important; width: 83.33% !important}
+            img {padding-bottom: 3rem !important}
+            @media (min-width: 992px) { img {padding-bottom: 1.75rem !important} }
             "
         ),
         h1(class = "text-center mt-2", "CS:GO grenade visualization"),

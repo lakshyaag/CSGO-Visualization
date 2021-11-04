@@ -36,3 +36,6 @@ vignettes/*.pdf
 rsconnect/
 
 demos/
+
+# RMarkdown documents
+*.Rmd

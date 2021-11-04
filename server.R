@@ -325,7 +325,7 @@ shinyServer(function(input, output) {
     output$matchGrenadesThrown <- renderPlot({
         req(input$dataUpload)
         grenadeBreakdownPlot(teams(), input$mapNum_1, input$teamNum, data())
-    })
+    }, height = 600)
 
     output$selectMap_2 <- renderUI({
         req(input$dataUpload)
@@ -351,5 +351,5 @@ shinyServer(function(input, output) {
     output$grenadeTrajectory <- renderPlot({
         req(input$dataUpload)
         grenadeTrajectoryPlot(input$mapNum_2, input$playerName, data())
-    })
+    }, height = 600)
 })
