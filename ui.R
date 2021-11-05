@@ -3,16 +3,19 @@ library(shiny)
 library(bslib)
 library(shinycssloaders)
 
+options(spinner.color = "#009688")
+options(spinner.type = 7)
+
 ui <-
     navbarPage(
-        title = "",
+        title = "CSGO Visualization",
         position = "static-top",
         collapsible = TRUE,
         inverse = TRUE,
-        windowTitle = "CSGO Visualization",
+        windowTitle = "CS:GO Visualization",
         theme = bs_theme(
             version = 5,
-            base_font = font_google("Lato"),
+            base_font = font_google("Questrial"),
             primary = "#009688",
             bootswatch = "zephyr",
             "navbar-light-bg" = "#009688"
@@ -21,7 +24,7 @@ ui <-
             .shiny-input-container {margin: auto}
             .progress {height: 1rem}
             .col-sm-8 {margin-right: auto !important; margin-left: auto !important; width: 83.33% !important}
-            .navbar-nav {justify-content: center !important; font-size: 1rem !important}
+            .navbar {font-size: 1rem !important}
             img {padding-bottom: 5rem !important}
             @media (min-width: 992px) { img {padding-bottom: 3rem !important} }
             "
@@ -54,15 +57,15 @@ ui <-
                             type = "pills",
                             tabPanel(
                                 "Grenade trajectories",
-                                fluidRow(column(width = 6, uiOutput("selectMap_2")),
-                                         column(width = 6, uiOutput("selectPlayer"))),
+                                fluidRow(column(width = 6, uiOutput("selectMap_2") %>% withSpinner()),
+                                         column(width = 6, uiOutput("selectPlayer") %>% withSpinner())),
                                 hr(),
                                 plotOutput("grenadeTrajectory", width = "100%") %>% withSpinner()
                             ),
                             tabPanel(
                                 "Grenade breakdown",
-                                fluidRow(column(width = 6, uiOutput("selectMap_1")),
-                                         column(width = 6, uiOutput("selectTeam"))),
+                                fluidRow(column(width = 6, uiOutput("selectMap_1") %>% withSpinner()),
+                                         column(width = 6, uiOutput("selectTeam") %>% withSpinner())),
                                 hr(),
                                 plotOutput("matchGrenadesThrown", width = "100%") %>% withSpinner()
                             )
@@ -78,7 +81,7 @@ ui <-
                 h2(class = "text-center mt-2", "CS:GO weapon heatmap"),
                 h5(
                     class = "text-center mt-2",
-                    "Upload the file containing kills data to view the heatmaps"
+                    "Upload the file containing kills data to view the heatmaps."
                 ),
                 div(class = "container-fluid col-6 justify-content-center p-3",
                     div(
@@ -97,9 +100,9 @@ ui <-
                             type = "pills",
                             tabPanel(
                                 "Weapon heatmap",
-                                fluidRow(column(width = 4, uiOutput("selectMap_3")),
-                                         column(width = 4, uiOutput("selectWeapon")),
-                                         column(width = 4, uiOutput("selectAttackerOrVictim"))),
+                                fluidRow(column(width = 4, uiOutput("selectMap_3") %>% withSpinner()),
+                                         column(width = 4, uiOutput("selectWeapon") %>% withSpinner()),
+                                         column(width = 4, uiOutput("selectPlayer_2") %>% withSpinner())),
                                 hr(),
                                 plotOutput("weaponHeatmap", width = "100%") %>% withSpinner()
                             )

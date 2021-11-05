@@ -14,7 +14,7 @@ library(png)
 library(RColorBrewer)
 library(paletteer)
 library(ggpubr)
-
+library(stringr)
 
 # windowsFonts(Helvetica = "Product Sans")
 
@@ -96,6 +96,14 @@ grenade_colors_map <-
         "Decoy Grenade" = "#78513a"
     )
 
+getSubtitle <- function(data) {
+    matchId <- (data %>% select(matchID) %>% unique() %>% pull())[1]
+    subtitleList <-
+        str_split(str_remove(matchId, "(-m\\d.*)"), "-", simplify = TRUE)
+    subtitle <-
+        glue("{str_to_upper(subtitleList[1])} vs. {str_to_upper(subtitleList[3])}")
+    return (subtitle)
+}
 
 # Plotting functions ----
 throwsPlot <- function(map_focus, team, data) {
@@ -133,49 +141,50 @@ throwsPlot <- function(map_focus, team, data) {
     return(plot)
 }
 
-grenadeBreakdownPlot <- function(teams, map_focus, team, data) {
-    if (team == "All") {
-        team1 <-
-            throwsPlot(map_focus, teams[1], data) + ggtitle(glue("{teams[1]}"))
-        team2 <-
-            throwsPlot(map_focus, teams[2], data) + ggtitle(glue("{teams[2]}"))
-        
-        plot <-
-            wrap_plots(
-                team1,
-                team2,
-                guides = "collect",
-                nrow = 1,
-                ncol = 2
-            )
-        plot <- plot +
-            plot_annotation(
-                title = glue(
-                    "Grenades thrown on <span style='color:#c44037;'>{map_focus}</span>"
-                ),
-                # subtitle = subtitle,
-                caption = caption,
-                theme = theme_lox() + theme(legend.position = "bottom")
-            )
-        
-        return(plot)
-    } else {
-        plot <- throwsPlot(map_focus, team, data) +
-            plot_annotation(
-                title = glue(
-                    "Grenades thrown by {team} on <span style='color:#c44037;'>{map_focus}</span>"
-                ),
-                # subtitle = subtitle,
-                caption = caption,
-                theme = theme_lox()
-            )
-        
-        return(plot)
+grenadeBreakdownPlot <-
+    function(teams, map_focus, team, subtitleVar, data) {
+        if (team == "All") {
+            team1 <-
+                throwsPlot(map_focus, teams[1], data) + ggtitle(glue("{teams[1]}"))
+            team2 <-
+                throwsPlot(map_focus, teams[2], data) + ggtitle(glue("{teams[2]}"))
+            
+            plot <-
+                wrap_plots(
+                    team1,
+                    team2,
+                    guides = "collect",
+                    nrow = 1,
+                    ncol = 2
+                )
+            plot <- plot +
+                plot_annotation(
+                    title = glue(
+                        "Grenades thrown on <span style='color:#c44037;'>{map_focus}</span>"
+                    ),
+                    subtitle = subtitleVar,
+                    caption = caption,
+                    theme = theme_lox() + theme(legend.position = "bottom")
+                )
+            
+            return(plot)
+        } else {
+            plot <- throwsPlot(map_focus, team, data) +
+                plot_annotation(
+                    title = glue(
+                        "Grenades thrown by {team} on <span style='color:#c44037;'>{map_focus}</span>"
+                    ),
+                    subtitle = subtitleVar,
+                    caption = caption,
+                    theme = theme_lox()
+                )
+            
+            return(plot)
+        }
     }
-}
 
 grenadeTrajectoryPlot <-
-    function(map_focus, player, data) {
+    function(map_focus, player, subtitleVar, data) {
         map_x <- mapCoordinates %>%
             filter(map_name == map_focus) %>%
             pull(x)
@@ -245,12 +254,12 @@ grenadeTrajectoryPlot <-
                 ),
                 strip.background = element_rect(fill = "grey5", colour = NA)
             ) +
-            facet_wrap( ~ throwerSide, scales = "free") +
+            facet_wrap(~ throwerSide, scales = "free") +
             plot_annotation(
                 title = glue(
                     "Grenade trajectories of <span style='color:#c44037;'>{player}</span> on {map_focus}"
                 ),
-                # subtitle = subtitle,
+                subtitle = subtitleVar,
                 caption = caption,
                 theme = theme_lox()
             )
@@ -262,7 +271,8 @@ grenadeTrajectoryPlot <-
 weaponHeatmapPlot <-
     function(map_focus,
              weapon_inspect,
-             attackerOrVictim,
+             player_name,
+             subtitleVar,
              data) {
         map_image = readPNG(glue("maps/{map_focus}_light.png"), native = TRUE)
         
@@ -276,36 +286,34 @@ weaponHeatmapPlot <-
             filter(map_name == map_focus) %>%
             pull(scale)
         
-        kills_weapon <- data %>%
-            filter(weapon == weapon_inspect & mapName == map_focus)
+        if (player_name == "All") {
+            kills_weapon <- data %>%
+                filter(weapon == weapon_inspect &
+                           mapName == map_focus)
+        } else {
+            kills_weapon <- data %>%
+                filter(weapon == weapon_inspect &
+                           mapName == map_focus & attackerName == player_name)
+        }
         
         kills_coords <- kills_weapon %>%
-            select(attackerX, attackerY, victimX, victimY, mapName, roundNum) %>%
+            select(attackerX, attackerY, mapName, roundNum) %>%
             mutate(attackerX = translateScaleX(attackerX, map_x, scale)) %>%
-            mutate(victimX = translateScaleX(victimX, map_x, scale)) %>%
-            mutate(attackerY = translateScaleY(attackerY, map_y, scale)) %>%
-            mutate(victimY = translateScaleY(victimY, map_y, scale))
+            mutate(attackerY = translateScaleY(attackerY, map_y, scale))
         
-        killer_heatmap <- switch (
-            attackerOrVictim,
-            "killer" = ggplot(kills_coords,
-                              aes(x = attackerX,
-                                  y = attackerY)),
-            "victim" = ggplot(kills_coords,
-                              aes(x = victimX,
-                                  y = victimY))
-        )
         
-        killer_heatmap <- killer_heatmap +
+        killer_heatmap <- ggplot(kills_coords,
+                                 aes(x = attackerX,
+                                     y = attackerY)) +
             background_image(map_image) +
             stat_density_2d_filled(
                 geom = "polygon",
                 contour = TRUE,
                 contour_var = 'ndensity',
                 h = c(32, 32),
-                n = 750,
+                n = 250,
                 aes(fill = (..level..)),
-                breaks = seq(0.15, 1, length.out = 6),
+                breaks = seq(0.15, 1, length.out = 7),
                 alpha = 0.9
             ) +
             scale_fill_manual(values = c(colorRampPalette(
@@ -314,16 +322,22 @@ weaponHeatmapPlot <-
                     n = 11,
                     direction = -1
                 )
-            )(6))) +
+            )(7))) +
             scale_x_continuous(limits = c(0, 1024), expand = c(0, 0)) +
             scale_y_reverse(limits = c(1024, 0), expand = c(0, 0)) +
             guides(fill = F) +
             theme_void() +
             plot_annotation(
-                title = glue(
-                    "Kill heatmap using <span style='color:#c44037;'>{weapon_inspect}</span> on *{map_focus}*"
+                title = if_else(
+                    player_name == "All",
+                    glue(
+                        "Kill heatmap using <span style='color:#c44037;'>{weapon_inspect}</span> on *{map_focus}*"
+                    ),
+                    glue(
+                        "Kill heatmap for <span style='color:#c44037;'>{player_name}</span> using <span style='color:#c44037;'>{weapon_inspect}</span> on *{map_focus}*"
+                    )
                 ),
-                # subtitle = glue("{number_of_matches_kills} matches | {subtitle}"),
+                subtitle = subtitleVar,
                 caption = caption,
                 theme = theme_lox()
             )
@@ -370,6 +384,10 @@ shinyServer(function(input, output) {
                 pull()
         })
     
+    subtitleMatchGrenade <- reactive({
+        getSubtitle(grenadeData())
+    })
+    
     
     output$selectMap_1 <- renderUI({
         req(input$dataUploadGrenades)
@@ -394,7 +412,14 @@ shinyServer(function(input, output) {
     
     output$matchGrenadesThrown <- renderPlot({
         req(input$dataUploadGrenades)
-        grenadeBreakdownPlot(teams(), input$mapNum_1, input$teamNum, grenadeData())
+        
+        grenadeBreakdownPlot(
+            teams(),
+            input$mapNum_1,
+            input$teamNum,
+            subtitleMatchGrenade(),
+            grenadeData()
+        )
     }, height = 600)
     
     output$selectMap_2 <- renderUI({
@@ -419,7 +444,10 @@ shinyServer(function(input, output) {
     
     output$grenadeTrajectory <- renderPlot({
         req(input$dataUploadGrenades)
-        grenadeTrajectoryPlot(input$mapNum_2, input$playerName, grenadeData())
+        grenadeTrajectoryPlot(input$mapNum_2,
+                              input$playerName,
+                              subtitleMatchGrenade(),
+                              grenadeData())
     }, height = 600)
     
     # Weapon heatmap ----
@@ -468,23 +496,40 @@ shinyServer(function(input, output) {
         )
     })
     
-    output$selectAttackerOrVictim <- renderUI({
+    playerList <-
+        reactive({
+            weaponData() %>%
+                filter(mapName == input$mapNum_3 &
+                           weapon == input$weaponName) %>%
+                select(attackerName) %>%
+                unique() %>%
+                pull()
+        })
+    
+    output$selectPlayer_2 <- renderUI({
         req(input$dataUploadKills)
-        radioButtons(
-            "attackerOrVictim",
-            "Attacker or victim?",
-            c("Attacker" = "killer", "Victim" = "victim"),
-            width = "100%",
-            inline = TRUE
+        selectInput(
+            "playerName_2",
+            "Select player",
+            c("All", playerList()),
+            selectize = T,
+            width = "100%"
         )
+    })
+    
+    subtitleMatchWeapons <- reactive({
+        getSubtitle(weaponData())
     })
     
     output$weaponHeatmap <- renderPlot({
         req(input$dataUploadKills)
-        weaponHeatmapPlot(input$mapNum_3,
-                          input$weaponName,
-                          input$attackerOrVictim,
-                          weaponData())
+        weaponHeatmapPlot(
+            input$mapNum_3,
+            input$weaponName,
+            input$playerName_2,
+            subtitleMatchWeapons(),
+            weaponData()
+        )
     }, height = 600)
     
     
