@@ -45,8 +45,8 @@ ui <-
                         class = "card shadow",
                         div(class = "card-body text-center d-flex",
                             fileInput(
-                                "dataUploadGrenades", "Upload .csv file",
-                                accept = c(".csv")
+                                "dataUploadGrenades", "Upload .xlsx file",
+                                accept = c(".xlsx")
                             ))
                     )),
                 div(class = "container-fluid col-12",
@@ -59,6 +59,10 @@ ui <-
                                 "Grenade trajectories",
                                 fluidRow(column(width = 6, uiOutput("selectMap_2") %>% withSpinner()),
                                          column(width = 6, uiOutput("selectPlayer") %>% withSpinner())),
+                                hr(),
+                                fluidRow(column(width = 4, htmlOutput("flashNumEnemy") %>% withSpinner()),
+                                         column(width = 4, htmlOutput("flashDuration") %>% withSpinner()),
+                                         column(width = 4, htmlOutput("grenadeDmg") %>% withSpinner())),
                                 hr(),
                                 plotOutput("grenadeTrajectory", width = "100%") %>% withSpinner()
                             ),

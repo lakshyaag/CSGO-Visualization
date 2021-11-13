@@ -15,6 +15,7 @@ library(RColorBrewer)
 library(paletteer)
 library(ggpubr)
 library(stringr)
+library(readxl)
 
 # windowsFonts(Helvetica = "Product Sans")
 
@@ -254,7 +255,7 @@ grenadeTrajectoryPlot <-
                 ),
                 strip.background = element_rect(fill = "grey5", colour = NA)
             ) +
-            facet_wrap(~ throwerSide, scales = "free") +
+            facet_wrap( ~ throwerSide, scales = "free") +
             plot_annotation(
                 title = glue(
                     "Grenade trajectories of <span style='color:#c44037;'>{player}</span> on {map_focus}"
@@ -267,6 +268,29 @@ grenadeTrajectoryPlot <-
         return(player_grenades_map)
     }
 
+
+flashStats <- function(map_focus, player_focus, data) {
+    flashData <- data %>%
+        filter(mapName == map_focus) %>%
+        filter(attackerName == player_focus) %>%
+        group_by(tick, attackerTeam, playerTeam) %>%
+        summarise(n = n(), flashDur = sum(flashDuration)) %>%
+        filter(attackerTeam != playerTeam) %>%
+        ungroup() %>%
+        summarise(n = sum(n), flashDur = sum(flashDur))
+    
+    return(flashData)
+}
+
+dmgStats <- function(map_focus, player_focus, data) {
+    dmgData <- data %>%
+        filter(mapName == map_focus) %>%
+        filter(attackerName == player_focus) %>%
+        filter(weapon %in% c("HE Grenade", "Molotov", "Incendiary Grenade")) %>%
+        summarise(dmg = sum(hpDamageTaken))
+    
+    return(dmgData)
+}
 
 weaponHeatmapPlot <-
     function(map_focus,
@@ -293,7 +317,8 @@ weaponHeatmapPlot <-
         } else {
             kills_weapon <- data %>%
                 filter(weapon == weapon_inspect &
-                           mapName == map_focus & attackerName == player_name)
+                           mapName == map_focus &
+                           attackerName == player_name)
         }
         
         kills_coords <- kills_weapon %>%
@@ -353,13 +378,23 @@ shinyServer(function(input, output) {
     
     grenadeData <- reactive({
         req(input$dataUploadGrenades)
-        read_csv(input$dataUploadGrenades$datapath) %>%
+        read_xlsx(input$dataUploadGrenades$datapath, sheet = "grenades") %>%
             mutate(grenadeType = replace(
                 grenadeType,
                 grenadeType == "Incendiary Grenade",
                 "Molotov"
             )) %>%
             filter(grenadeType != "Decoy Grenade")
+    })
+    
+    dmgData <- reactive({
+        req(input$dataUploadGrenades)
+        read_xlsx(input$dataUploadGrenades$datapath, sheet = "damages")
+    })
+    
+    flashData <- reactive({
+        req(input$dataUploadGrenades)
+        read_xlsx(input$dataUploadGrenades$datapath, sheet = "flashes")
     })
     
     maps <-
@@ -449,6 +484,63 @@ shinyServer(function(input, output) {
                               subtitleMatchGrenade(),
                               grenadeData())
     }, height = 600)
+    
+    flashStatsOutput <- reactive({
+        flashStats(input$mapNum_2,
+                   input$playerName,
+                   flashData())
+    })
+    
+    dmgStatsOutput <- reactive({
+        dmgStats(input$mapNum_2,
+                   input$playerName,
+                   dmgData())
+    })
+    
+    output$flashNumEnemy <- renderUI({
+        req(flashData())
+        HTML(glue(
+            '
+                <div class="card text-white bg-primary mx-1">
+                        <div class="card-body">
+                                <p class="card-text display-6">{flashStatsOutput()$n}</p>
+                                <p class="card-text">Enemies flashed</p>
+                        </div>
+                    </div>
+             ')
+            )
+        
+    })
+    
+    output$flashDuration <- renderUI({
+        req(flashData())
+        HTML(glue(
+            '
+                <div class="card text-white bg-info mx-1">
+                        <div class="card-body">
+                                <p class="card-text display-6">{round(flashStatsOutput()$flashDur, 1)}</p>
+                                <p class="card-text">Total duration flashed (seconds)</p>
+                        </div>
+                    </div>
+             ')
+        )
+        
+    })
+    
+    output$grenadeDmg <- renderUI({
+        req(dmgData())
+        HTML(glue(
+            '
+                <div class="card text-white bg-danger mx-1">
+                        <div class="card-body">
+                                <p class="card-text display-6">{dmgStatsOutput()$dmg}</p>
+                                <p class="card-text">Total grenade damage</p>
+                        </div>
+                    </div>
+             ')
+        )
+        
+    })
     
     # Weapon heatmap ----
     

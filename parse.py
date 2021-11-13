@@ -76,6 +76,14 @@ def saveData(match_df, id_):
     match_df['playerFrames'].to_csv(
         f"./parsed_demo_files/{id_}/{id_}_playerFrames.csv", index=False)
 
+    # Append all grenades to one file
+
+    with pd.ExcelWriter(path=f"./parsed_demo_files/{id_}/{id_}_grenades_overall.xlsx") as writer:
+        match_df['grenades'].to_excel(writer, sheet_name="grenades", index=False)
+        match_df['damages'].to_excel(writer, sheet_name="damages", index=False)
+        match_df['flashes'].to_excel(writer, sheet_name="flashes", index=False)
+    
+
 
 def removeJson():
     [os.remove(f) for f in os.listdir('./') if f.endswith(".json")]

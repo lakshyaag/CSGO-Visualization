@@ -34,7 +34,7 @@ After installing the CS:GO library on your environment and downloading the requi
 2. Change the working directory to the newly cloned directory
 3. Create a new folder called `demos` and move all download `.dem` files to be parsed - read [Directory Strucutre](#directory-structure) for more
 4. Run `parse.py`, specifying the folder name containing the `.dem` files and the `match_id`
-5. The parser will take care of appending all maps in a match and will provide `.csv` files for multiple metrics such as Kills, Damages, Grenades, Rounds, etc. in a folder named `parsed_demo_files`
+5. The parser will take care of appending all maps in a match and will provide `.csv`/`.xlsx` files for multiple metrics such as Kills, Damages, Grenades, Rounds, etc. in a folder named `parsed_demo_files`
 6. Upload the `grenades.csv`/`weapons.csv` file of the respective match to the [Shiny app](https://lakshyaag.shinyapps.io/CSGO-Visualization/)!
 
 ## Directory structure
@@ -69,8 +69,8 @@ Using this parser is simple. For example, if you wanted to check the grenade tra
 
    Here, the first argument specifies the folder containing the `.dem` files, the second argument provides the `match_id` to use. Finally, `-j` tells the parser to remove the interim `.json` output to save disk space.
 
-4. Once the parser has completed processing, the `.csv` files will be stored in `/CSGO-Visualization/demos/parsed_demo_files/cph-vs-nip-bo3-pgl-major-2021/`
-5. From here, simply upload the `cph-vs-nip-bo3-pgl-major-2021_grenades.csv` to the [Shiny application](https://lakshyaag.shinyapps.io/CSGO-Visualization/)
+4. Once the parser has completed processing, the files will be stored in `/CSGO-Visualization/demos/parsed_demo_files/cph-vs-nip-bo3-pgl-major-2021/`
+5. From here, simply upload the `g2-vs-nip-bo3-pgl-major-2021_grenades_overall.xlsx` to the [Shiny application](https://lakshyaag.shinyapps.io/CSGO-Visualization/)
 
 ## Questions
 
